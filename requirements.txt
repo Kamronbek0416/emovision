@@ -9,5 +9,6 @@ pillow
 uuid
 gunicorn
 uvicorn
-tf-keras
-retinaface
+tensorflow==2.5.0
+deepface==0.0.75
+retinaface==0.0.13
