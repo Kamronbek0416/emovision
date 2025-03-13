@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 style="text-align: center; margin-bottom: 20px;">Распознавание эмоций (Реальное время)</h1>
+
+<div style="text-align: center; margin-bottom: 20px;">
+    <button onclick="startRealTime()" style="padding: 10px 20px; background-color: #1ABC9C; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">
+        Начать анализ
+    </button>
+    <button onclick="stopRealTime()" style="padding: 10px 20px; background-color: #E74C3C; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin-left: 10px;">
+        Стоп
+    </button>
+</div>
+
+<div class="video-container" style="display: flex; justify-content: center; align-items: center; flex-direction: column;">
+    <video id="video" autoplay playsinline class="hidden" style="margin-top: 20px; max-width: 100%; border: 3px solid #2980B9; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);"></video>
+    <canvas id="canvas" class="hidden" style="display: none;"></canvas>
+</div>
+
+<p id="realTimeResult" class="result" style="text-align: center; font-size: 18px; font-style: italic; color: #34495E; margin-top: 20px;">
+    Ожидание анализа...
+</p>
+
+<script>
+let videoStream;
+let intervalId;
+
+async function startRealTime() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        videoStream = stream;
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const realTimeResult = document.getElementById('realTimeResult');
+
+        video.srcObject = stream;
+        video.classList.remove('hidden');
+
+        if (intervalId) clearInterval(intervalId);
+
+    intervalId = setInterval(() => {
+    const ctx = canvas.getContext('2d');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    // Отобразить видеопоток на canvas
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Отправить кадр для анализа
+    canvas.toBlob(blob => {
+        const formData = new FormData();
+        formData.append('image', blob, 'frame.jpg');
+
+        fetch('/analyze_realtime', { method: 'POST', body: formData })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    realTimeResult.innerText = `Ошибка: ${data.error}`;
+                    realTimeResult.style.color = '#E74C3C';
+                } else if (data.results && data.results.length > 0) {
+                    // Очистить canvas
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                    data.results.forEach(result => {
+                        const { region, dominant_emotion, confidence } = result;
+
+                        const x = region.x;
+                        const y = region.y;
+                        const w = region.w;
+                        const h = region.h;
+
+                        // Цвета для разных эмоций
+                        const emotionColors = {
+                            happy: "#F1C40F",
+                            sad: "#3498DB",
+                            angry: "#E74C3C",
+                            surprise: "#9B59B6",
+                            neutral: "#2ECC71",
+                            fear: "#E67E22",
+                            disgust: "#95A5A6"
+                        };
+
+                        const boxColor = emotionColors[dominant_emotion] || "#FFFFFF";
+
+                        // Нарисовать рамку вокруг лица
+                        ctx.strokeStyle = boxColor;
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(x, y, w, h);
+
+                        // Подпись эмоции над рамкой
+                        ctx.fillStyle = boxColor;
+                        ctx.font = '16px Arial';
+                        ctx.fillText(`${dominant_emotion} (${confidence.toFixed(2)}%)`, x, y - 5);
+                    });
+
+                    // Обновление текста результатов
+                    realTimeResult.innerText = data.results.map(result =>
+                        `${result.dominant_emotion} (${result.confidence.toFixed(2)}%)`
+                    ).join(', ');
+                    realTimeResult.style.color = '#27AE60';
+                } else {
+                    realTimeResult.innerText = 'Лица не обнаружены.';
+                    realTimeResult.style.color = '#E74C3C';
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка:', error);
+                realTimeResult.innerText = `Ошибка анализа: ${error.message}`;
+                realTimeResult.style.color = '#E74C3C';
+            });
+    }, 'image/jpeg');
+}, 2000);
+    } catch (error) {
+        console.error("Ошибка реального времени:", error);
+        const realTimeResult = document.getElementById('realTimeResult');
+        realTimeResult.innerText = "Ошибка доступа к камере";
+        realTimeResult.style.color = "#E74C3C";
+    }
+}
+
+function stopRealTime() {
+    const video = document.getElementById('video');
+    const realTimeResult = document.getElementById('realTimeResult');
+
+    if (videoStream) {
+        const tracks = videoStream.getTracks();
+        tracks.forEach(track => track.stop());
+        videoStream = null;
+    }
+    video.classList.add('hidden');
+    realTimeResult.innerText = 'Анализ остановлен.';
+    realTimeResult.style.color = '#34495E';
+
+    if (intervalId) clearInterval(intervalId); // Очищаем интервал
+}
+</script>
+{% endblock %}

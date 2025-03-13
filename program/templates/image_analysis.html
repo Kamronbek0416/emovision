@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="text-center mt-3">Распознавание эмоций (Фото)</h1>
+<div class="d-flex flex-column align-items-center" style="display: flex; flex-direction: row; align-items: flex-start; flex-wrap: wrap;">
+
+    <form id="uploadForm" enctype="multipart/form-data" class="mt-3 w-100" style="max-width: 300px;">
+        <input type="file" id="fileInput" name="image" accept="image/*" class="form-control mb-2" required>
+        <button type="submit" class="btn btn-primary">Анализировать Фото</button>
+    </form>
+    <!-- Уменьшено изображение результата с max-width -->
+<img id="outputImage" alt="Uploaded Image" class="d-none rounded border mt-3" style="max-width: 90%; height: auto; margin-right: 20px; border: 1px solid #ddd;">
+
+<div id="result" class="text-center mt-3 w-100 d-flex justify-content-center align-items-center" style="flex: 1; height: auto;"></div>
+</div>
+
+<style>
+    #result {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        height: auto;
+    }
+    @media (max-width: 768px) {
+        .d-flex {
+            flex-direction: column !important;
+            align-items: center !important;
+        }
+        form {
+            width: 100% !important;
+            max-width: none !important;
+        }
+        img {
+            max-width: 90% !important;
+            margin: 0 auto !important;
+        }
+    }
+</style>
+<div id="spinner" class="spinner-border text-primary d-none" role="status" style="margin: 10px auto;">
+    <span class="visually-hidden">Loading...</span>
+</div>
+<script>
+const form = document.getElementById('uploadForm');
+const fileInput = document.getElementById('fileInput');
+const resultDiv = document.getElementById('result');
+const outputImage = document.getElementById('outputImage');
+
+form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const file = fileInput.files[0];
+    if (!file) {
+        resultDiv.textContent = 'Пожалуйста, выберите файл перед анализом.';
+        return;
+    }
+    const formData = new FormData();
+    formData.append('image', file);
+    // Показать спиннер загрузки
+    document.getElementById('spinner').classList.remove('d-none');
+    resultDiv.textContent = 'Обработка изображения...';
+
+    try {
+        const response = await fetch('/analyze', {
+            method: 'POST',
+            body: formData,
+        });
+        const data = await response.json();
+        if (data.error) {
+            resultDiv.textContent = `Ошибка: ${data.error}`;
+            return;
+        }
+
+        // Обработка данных в зависимости от их структуры
+        if (data.results && data.results.length > 0) {
+            let resultHTML = '<h2 style="text-align: center; margin-bottom: 20px;">Распознанные эмоции:</h2>';
+            data.results.forEach((result, index) => {
+                resultHTML += `<div style="margin-top: 10px;"><div><strong>Лицо ${index + 1}:</strong></div>`;
+                resultHTML += `<div style="margin-left: 15px;">Доминирующая эмоция: ${result.dominant_emotion} (${result.confidence.toFixed(2)}%)<br>`;
+                for (const [emotion, probability] of Object.entries(result.emotions)) {
+                    resultHTML += `${emotion}: ${probability.toFixed(2)}%<br>`;
+                }
+                resultHTML += '</div></div><br>';
+            });
+            resultDiv.innerHTML = resultHTML;
+        } else {
+            resultDiv.textContent = 'Лица не обнаружены на изображении.';
+        }
+
+
+        // Скрыть спиннер загрузки
+        document.getElementById('spinner').classList.add('d-none');
+        // Отображение изображения, если URL присутствует
+        if (data.result_image_url) {
+            outputImage.src = data.result_image_url;
+            outputImage.style.maxWidth = '500px'; // Ограничиваем ширину выходного изображения
+            outputImage.style.height = 'auto';    // Сохраняем пропорции
+            outputImage.classList.remove('d-none'); // Делаем видимым
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        resultDiv.textContent = `Ошибка анализа: ${error.message}`;
+        // Скрыть спиннер загрузки
+        document.getElementById('spinner').classList.add('d-none');
+    }
+});
+
+</script>
+<!-- Подключение Chart.js перед закрытием блока -->
+
+{% endblock %}
