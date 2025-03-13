@@ -9,3 +9,5 @@ pillow
 uuid
 gunicorn
 uvicorn
+tf-keras
+retinaface
