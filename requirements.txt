@@ -9,6 +9,6 @@ pillow
 uuid
 gunicorn
 uvicorn
-tensorflow>=2.12.0
-deepface==0.0.75
-retinaface
+tensorflow
+deepface
+
