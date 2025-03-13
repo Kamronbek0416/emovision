@@ -11,4 +11,4 @@ gunicorn
 uvicorn
 tensorflow
 deepface
-
+tf-keras
